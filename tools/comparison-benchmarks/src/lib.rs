@@ -4,8 +4,8 @@ use aya_poker::{PokerHandRank, PokerRankCategory, base as aya};
 use eval7_rs::{Card as Eval7Card, Evaluator as Eval7Evaluator, HandCategory, HandRank};
 use poker::{Card as PokerCard, Evaluator as PokerEvaluator, Rank as PokerRank, Suit as PokerSuit};
 use rs_poker::core::{
-    Card as RsCard, CoreRank, Hand as RsHand, Rank as RsRank, Rankable, Suit as RsSuit,
-    Value as RsValue,
+    Card as RsCard, CoreRank, Hand as RsHand, Rank as RsRank, Rankable, SevenCardAccum,
+    Suit as RsSuit, Value as RsValue,
 };
 
 pub const COMBINATION_COUNT: u64 = 133_784_560;
@@ -145,12 +145,28 @@ pub fn rs_poker_hand(ids: CardIds) -> RsHand {
     rs_poker
 }
 
+#[inline]
+pub fn rs_poker_accumulator(ids: CardIds) -> SevenCardAccum {
+    let mut accumulator = SevenCardAccum::new();
+    for id in ids {
+        accumulator.add(rs_card(id));
+    }
+    accumulator
+}
+
 pub fn aya_poker_hand(ids: CardIds) -> aya::Hand {
     let mut aya_poker = aya::Hand::new();
     for id in ids {
         aya_poker.insert_unchecked(&aya_card(id));
     }
     aya_poker
+}
+
+#[inline]
+pub fn aya_poker_hand_checked(ids: CardIds) -> aya::Hand {
+    let mut hand = aya::Hand::new();
+    hand.extend(ids.map(aya_card));
+    hand
 }
 
 pub fn poker_hand(ids: CardIds) -> [PokerCard; 7] {
@@ -322,5 +338,16 @@ mod tests {
                 .iter()
                 .all(|hand| hand.windows(2).all(|w| w[0] < w[1]))
         );
+    }
+
+    #[test]
+    fn checked_and_prevalidated_construction_paths_agree() {
+        for ids in sampled_card_ids(1_000) {
+            assert_eq!(
+                aya_poker::poker_rank(&aya_poker_hand_checked(ids)),
+                aya_poker::poker_rank(&aya_poker_hand(ids))
+            );
+            assert_eq!(rs_poker_hand(ids).rank(), rs_poker_accumulator(ids).rank());
+        }
     }
 }

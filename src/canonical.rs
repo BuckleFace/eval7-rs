@@ -4,19 +4,32 @@ pub(crate) type Canonical7Key = u64;
 
 #[inline]
 pub(crate) fn canonical_key_7_by_suit_masks(cards: [Card; 7]) -> Canonical7Key {
+    canonical_key_from_sorted_suit_masks(sort_suit_masks(suit_masks_7(cards)))
+}
+
+#[inline]
+pub(crate) fn suit_masks_7(cards: [Card; 7]) -> [u16; 4] {
     let mut packed = 0u64;
     for card in cards {
         packed |= CARD_LANE_MASKS[card.id() as usize];
     }
 
-    let mut masks = [
+    [
         (packed & MASK_13) as u16,
         ((packed >> 13) & MASK_13) as u16,
         ((packed >> 26) & MASK_13) as u16,
         ((packed >> 39) & MASK_13) as u16,
-    ];
-    masks.sort_unstable();
+    ]
+}
 
+#[inline]
+pub(crate) fn sort_suit_masks(mut masks: [u16; 4]) -> [u16; 4] {
+    masks.sort_unstable();
+    masks
+}
+
+#[inline]
+pub(crate) fn canonical_key_from_sorted_suit_masks(masks: [u16; 4]) -> Canonical7Key {
     ((masks[0] as u64) << 39)
         | ((masks[1] as u64) << 26)
         | ((masks[2] as u64) << 13)

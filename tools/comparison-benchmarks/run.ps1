@@ -2,6 +2,7 @@
 param(
     [string]$OutputRoot,
     [string]$AffinityMask,
+    [switch]$DiagnosticsOnly,
     [switch]$ValidateOnly
 )
 
@@ -47,6 +48,7 @@ try {
     $Rustc = (rustc -Vv) -join "`n"
     $Cargo = (cargo -V).Trim()
     $RustFlags = if ($env:RUSTFLAGS) { $env:RUSTFLAGS } else { '(unset; generic target defaults)' }
+    $SuiteDescription = if ($DiagnosticsOnly) { 'diagnostics only' } else { 'comparison and diagnostics' }
 
     if ($AffinityMask) {
         $MaskText = $AffinityMask -replace '^0x', ''
@@ -65,6 +67,7 @@ try {
 - Timestamp: $(Get-Date -Format o)
 - Git commit: $Commit
 - Worktree dirty: $Dirty
+- Benchmark selection: $SuiteDescription
 - Affinity mask: $(if ($AffinityMask) { $AffinityMask } else { 'not set; Windows scheduler controls placement' })
 - Build profiles: Criterion uses bench; probes use release; both set `codegen-units = 1` and `lto = "thin"`
 - RUSTFLAGS: $RustFlags
@@ -103,7 +106,7 @@ $($DirtyLines -join "`n")
     }
 
     if ($ValidateOnly) {
-        Set-Content -LiteralPath (Join-Path $OutputDirectory 'VALIDATION_ONLY.txt') -Value 'Correctness preflight completed. No performance measurements were run.' -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $OutputDirectory 'VALIDATION_ONLY.txt') -Value "Correctness preflight completed for $SuiteDescription. No performance measurements were run." -Encoding utf8
         Write-Host "Validation-only run completed: $OutputDirectory"
         return
     }
@@ -118,8 +121,14 @@ $($DirtyLines -join "`n")
         Move-Item -LiteralPath $CriterionDirectory -Destination (Join-Path $RawDirectory 'criterion-preexisting')
     }
 
-    Invoke-Logged -Name 'Criterion comparison suite' -LogPath (Join-Path $RawDirectory 'criterion.log') -Command {
-        cargo bench --locked --manifest-path $Manifest --bench comparison -- --noplot
+    if (!$DiagnosticsOnly) {
+        Invoke-Logged -Name 'Criterion comparison suite' -LogPath (Join-Path $RawDirectory 'criterion.log') -Command {
+            cargo bench --locked --manifest-path $Manifest --bench comparison -- --noplot
+        }
+    }
+
+    Invoke-Logged -Name 'Criterion diagnostic suite' -LogPath (Join-Path $RawDirectory 'criterion-diagnostics.log') -Command {
+        cargo bench --locked --manifest-path $Manifest --bench diagnostics -- --noplot
     }
 
     if (!(Test-Path -LiteralPath $CriterionDirectory)) {
@@ -127,61 +136,63 @@ $($DirtyLines -join "`n")
     }
     Copy-Item -Recurse -LiteralPath $CriterionDirectory -Destination (Join-Path $RawDirectory 'criterion')
 
-    Invoke-Logged -Name 'probe build' -LogPath (Join-Path $RawDirectory 'probe-build.log') -Command {
-        cargo build --release --locked --manifest-path $Manifest --bin probe
-    }
-    $Probe = Join-Path $TargetDirectory 'release\probe.exe'
-    $ProbeNames = @('noop', 'eval7-formula', 'eval7', 'rs_poker', 'aya_poker', 'poker')
-    $InitializationPath = Join-Path $RawDirectory 'initialization.txt'
-    foreach ($Name in $ProbeNames) {
-        for ($Iteration = 1; $Iteration -le 20; $Iteration++) {
-            try {
-                "iteration=$Iteration $(& $Probe $Name 0 0)" | Add-Content -LiteralPath $InitializationPath -Encoding utf8
-                if ($LASTEXITCODE -ne 0) { throw "exit code $LASTEXITCODE" }
-            } catch {
-                $Failures.Add("initialization probe $Name iteration $Iteration failed: $_")
-            }
+    if (!$DiagnosticsOnly) {
+        Invoke-Logged -Name 'probe build' -LogPath (Join-Path $RawDirectory 'probe-build.log') -Command {
+            cargo build --release --locked --manifest-path $Manifest --bin probe
         }
-    }
-
-    $MemoryRows = @()
-    foreach ($Name in $ProbeNames) {
-        $Stdout = Join-Path $RawDirectory "memory-$Name.stdout.txt"
-        $Stderr = Join-Path $RawDirectory "memory-$Name.stderr.txt"
-        try {
-            $Process = Start-Process -FilePath $Probe -ArgumentList @($Name, '3000', '20000') -PassThru -RedirectStandardOutput $Stdout -RedirectStandardError $Stderr
-            $ReadyDeadline = (Get-Date).AddSeconds(30)
-            while (!$Process.HasExited -and (!(Test-Path -LiteralPath $Stdout) -or (Get-Item -LiteralPath $Stdout).Length -eq 0)) {
-                if ((Get-Date) -gt $ReadyDeadline) {
-                    throw 'probe did not signal readiness within 30 seconds'
+        $Probe = Join-Path $TargetDirectory 'release\probe.exe'
+        $ProbeNames = @('noop', 'eval7-formula', 'eval7', 'rs_poker', 'aya_poker', 'poker')
+        $InitializationPath = Join-Path $RawDirectory 'initialization.txt'
+        foreach ($Name in $ProbeNames) {
+            for ($Iteration = 1; $Iteration -le 20; $Iteration++) {
+                try {
+                    "iteration=$Iteration $(& $Probe $Name 0 0)" | Add-Content -LiteralPath $InitializationPath -Encoding utf8
+                    if ($LASTEXITCODE -ne 0) { throw "exit code $LASTEXITCODE" }
+                } catch {
+                    $Failures.Add("initialization probe $Name iteration $Iteration failed: $_")
                 }
-                Start-Sleep -Milliseconds 50
-                $Process.Refresh()
             }
-            if ($Process.HasExited) {
-                throw "probe exited before memory snapshot with exit code $($Process.ExitCode)"
-            }
-            $Snapshot = Get-Process -Id $Process.Id
-            $MemoryRows += [pscustomobject]@{
-                evaluator = $Name
-                pid = $Process.Id
-                working_set_bytes = $Snapshot.WorkingSet64
-                private_bytes = $Snapshot.PrivateMemorySize64
-                peak_working_set_bytes = $Snapshot.PeakWorkingSet64
-            }
-            $Process.WaitForExit()
-            # Windows PowerShell can retain a stale Process object after WaitForExit(),
-            # leaving ExitCode as $null until the object is refreshed.
-            $Process.Refresh()
-            if (!$Process.HasExited) { throw 'probe did not exit after WaitForExit returned' }
-            $MemoryExitCode = $Process.ExitCode
-            if ($null -eq $MemoryExitCode) { throw 'probe exit code was unavailable after refresh' }
-            if ($MemoryExitCode -ne 0) { throw "exit code $MemoryExitCode" }
-        } catch {
-            $Failures.Add("memory probe $Name failed: $_")
         }
+
+        $MemoryRows = @()
+        foreach ($Name in $ProbeNames) {
+            $Stdout = Join-Path $RawDirectory "memory-$Name.stdout.txt"
+            $Stderr = Join-Path $RawDirectory "memory-$Name.stderr.txt"
+            try {
+                $Process = Start-Process -FilePath $Probe -ArgumentList @($Name, '3000', '20000') -PassThru -RedirectStandardOutput $Stdout -RedirectStandardError $Stderr
+                $ReadyDeadline = (Get-Date).AddSeconds(30)
+                while (!$Process.HasExited -and (!(Test-Path -LiteralPath $Stdout) -or (Get-Item -LiteralPath $Stdout).Length -eq 0)) {
+                    if ((Get-Date) -gt $ReadyDeadline) {
+                        throw 'probe did not signal readiness within 30 seconds'
+                    }
+                    Start-Sleep -Milliseconds 50
+                    $Process.Refresh()
+                }
+                if ($Process.HasExited) {
+                    throw "probe exited before memory snapshot with exit code $($Process.ExitCode)"
+                }
+                $Snapshot = Get-Process -Id $Process.Id
+                $MemoryRows += [pscustomobject]@{
+                    evaluator = $Name
+                    pid = $Process.Id
+                    working_set_bytes = $Snapshot.WorkingSet64
+                    private_bytes = $Snapshot.PrivateMemorySize64
+                    peak_working_set_bytes = $Snapshot.PeakWorkingSet64
+                }
+                $Process.WaitForExit()
+                # Windows PowerShell can retain a stale Process object after WaitForExit(),
+                # leaving ExitCode as $null until the object is refreshed.
+                $Process.Refresh()
+                if (!$Process.HasExited) { throw 'probe did not exit after WaitForExit returned' }
+                $MemoryExitCode = $Process.ExitCode
+                if ($null -eq $MemoryExitCode) { throw 'probe exit code was unavailable after refresh' }
+                if ($MemoryExitCode -ne 0) { throw "exit code $MemoryExitCode" }
+            } catch {
+                $Failures.Add("memory probe $Name failed: $_")
+            }
+        }
+        $MemoryRows | Export-Csv -NoTypeInformation -LiteralPath (Join-Path $RawDirectory 'memory.csv')
     }
-    $MemoryRows | Export-Csv -NoTypeInformation -LiteralPath (Join-Path $RawDirectory 'memory.csv')
 
     $Rows = @()
     Get-ChildItem -Recurse -Filter estimates.json (Join-Path $RawDirectory 'criterion') |
@@ -208,10 +219,15 @@ $($DirtyLines -join "`n")
         "| $($_.benchmark) | $([math]::Round($_.ns_per_evaluation, 3)) | $([math]::Round($_.ci_lower_ns, 3))-$([math]::Round($_.ci_upper_ns, 3)) | $([math]::Round($_.evaluations_per_second, 0)) |"
     }) -join "`n"
     $FailureText = if ($Failures.Count -eq 0) { 'None recorded.' } else { ($Failures | ForEach-Object { "- $_" }) -join "`n" }
+    $ProbeText = if ($DiagnosticsOnly) {
+        'Initialization and process-memory probes were intentionally skipped in diagnostics-only mode.'
+    } else {
+        'Memory figures are Windows process-level observations, not allocator-exclusive byte counts. Compare them with the noop process and the exact static sizes printed by each probe. Initialization and first-use observations are stored raw because individual wall-clock samples are intentionally not presented as Criterion-quality estimates.'
+    }
     $Summary = @"
 # Eval7 comparison benchmark summary
 
-See metadata.md for the environment and raw/ for Criterion samples, console logs, initialization observations, and process-memory snapshots.
+See metadata.md for the environment and raw/ for Criterion samples and console logs.
 
 | Benchmark | Mean ns/evaluation | 95% CI (ns) | Evaluations/s |
 |---|---:|---:|---:|
@@ -221,7 +237,7 @@ $Table
 
 $FailureText
 
-Memory figures are Windows process-level observations, not allocator-exclusive byte counts. Compare them with the noop process and the exact static sizes printed by each probe. Initialization and first-use observations are stored raw because individual wall-clock samples are intentionally not presented as Criterion-quality estimates.
+$ProbeText
 "@
     Set-Content -LiteralPath (Join-Path $OutputDirectory 'summary.md') -Value $Summary -Encoding utf8
 

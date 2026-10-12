@@ -17,6 +17,10 @@ criterion = { version = "=0.8.2", default-features = false, features = ["cargo_b
 name = "comparison"
 harness = false
 
+[[bench]]
+name = "diagnostics"
+harness = false
+
 [profile.release]
 codegen-units = 1
 lto = "thin"

@@ -17,6 +17,18 @@ All versions are exact pins in `Cargo.toml` and resolved by the committed packag
 - `api_overhead`: duplicate validation, free-function versus reusable-evaluator calls, per-card conversion, and full native-representation conversion.
 - `probe`: fresh-process initialization, first use, a short warm sequence, and process-memory observation.
 
+The separate `diagnostics` target adds:
+
+- `raw_end_to_end`: complete conversion and evaluation from the same `[u8; 7]` input;
+- `native_construction`: native representation construction without ranking;
+- `preconstructed_evaluation`: the native-input boundary retained for comparison;
+- `fixed_board_raw_full`: complete rebuilding for every legal hole pair;
+- `fixed_board_raw_incremental`: separately labelled reuse of legal board state;
+- `eval7_internal`: isolated canonicalisation, formula-index and table stages;
+- `eval7_table_access`: sequential versus representative scattered table indices.
+
+Checked and prevalidated variants use separate benchmark identifiers. The prevalidated fixtures are generated as distinct seven-card combinations before timing.
+
 Eval7's exact static accounting is reported alongside the process observations: 12,018,382 embedded bytes (64-byte header plus 6,009,159 little-endian `u16` ranks) and 1,319,072 requested heap bytes for a formula indexer, excluding allocator metadata. The inline indexer size is obtained from `size_of` for the current target. Competitor allocation totals are not exposed by their APIs, so those remain process-level comparisons against the `noop` probe.
 
 The fixture generator maps an affine sequence onto lexicographic combination ranks. Its stride, 1,000,003, is coprime with C(52,7), so it visits every combination exactly once before repeating. Cards within each hand are strictly increasing. Generation and conversion happen outside Criterion timing except in the explicitly named conversion benchmarks.
@@ -44,6 +56,18 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\comparison-bench
 ```
 
 The full runner performs correctness preflight before timing, records system and Git metadata, runs Criterion in a fixed order, retains raw Criterion data and logs, launches fresh-process probes, captures approximate Windows process memory after touching 20,000 deterministic hands, and writes CSV and Markdown summaries under the ignored `benchmark-results/<timestamp>/` directory.
+
+The default command runs both the original comparison and the new diagnostics. To run only the diagnostics, without the original 77 Criterion cases or the initialization/memory probes:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\comparison-benchmarks\run.ps1 -DiagnosticsOnly
+```
+
+Affinity can be combined with this mode:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\comparison-benchmarks\run.ps1 -DiagnosticsOnly -AffinityMask 0x0000000F
+```
 
 Criterion uses Cargo's `bench` profile and the probes use `release`; both set thin LTO and one codegen unit. The runner does not force `target-cpu=native`, so the default command represents normal generic-target compilation. Any caller-provided `RUSTFLAGS` are preserved and recorded; keep them identical between runs.
 
