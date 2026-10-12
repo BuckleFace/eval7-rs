@@ -170,7 +170,13 @@ $($DirtyLines -join "`n")
                 peak_working_set_bytes = $Snapshot.PeakWorkingSet64
             }
             $Process.WaitForExit()
-            if ($Process.ExitCode -ne 0) { throw "exit code $($Process.ExitCode)" }
+            # Windows PowerShell can retain a stale Process object after WaitForExit(),
+            # leaving ExitCode as $null until the object is refreshed.
+            $Process.Refresh()
+            if (!$Process.HasExited) { throw 'probe did not exit after WaitForExit returned' }
+            $MemoryExitCode = $Process.ExitCode
+            if ($null -eq $MemoryExitCode) { throw 'probe exit code was unavailable after refresh' }
+            if ($MemoryExitCode -ne 0) { throw "exit code $MemoryExitCode" }
         } catch {
             $Failures.Add("memory probe $Name failed: $_")
         }
@@ -178,7 +184,9 @@ $($DirtyLines -join "`n")
     $MemoryRows | Export-Csv -NoTypeInformation -LiteralPath (Join-Path $RawDirectory 'memory.csv')
 
     $Rows = @()
-    Get-ChildItem -Recurse -Filter estimates.json (Join-Path $RawDirectory 'criterion') | ForEach-Object {
+    Get-ChildItem -Recurse -Filter estimates.json (Join-Path $RawDirectory 'criterion') |
+        Where-Object { $_.Directory.Name -eq 'new' } |
+        ForEach-Object {
         $Estimate = Get-Content -Raw -LiteralPath $_.FullName | ConvertFrom-Json
         $BenchmarkPath = Join-Path $_.DirectoryName 'benchmark.json'
         if (Test-Path -LiteralPath $BenchmarkPath) {
@@ -203,7 +211,7 @@ $($DirtyLines -join "`n")
     $Summary = @"
 # Eval7 comparison benchmark summary
 
-See `metadata.md` for the environment and `raw/` for Criterion samples, console logs, initialization observations, and process-memory snapshots.
+See metadata.md for the environment and raw/ for Criterion samples, console logs, initialization observations, and process-memory snapshots.
 
 | Benchmark | Mean ns/evaluation | 95% CI (ns) | Evaluations/s |
 |---|---:|---:|---:|
@@ -213,7 +221,7 @@ $Table
 
 $FailureText
 
-Memory figures are Windows process-level observations, not allocator-exclusive byte counts. Compare them with the `noop` process and the exact static sizes printed by each probe. Initialization and first-use observations are stored raw because individual wall-clock samples are intentionally not presented as Criterion-quality estimates.
+Memory figures are Windows process-level observations, not allocator-exclusive byte counts. Compare them with the noop process and the exact static sizes printed by each probe. Initialization and first-use observations are stored raw because individual wall-clock samples are intentionally not presented as Criterion-quality estimates.
 "@
     Set-Content -LiteralPath (Join-Path $OutputDirectory 'summary.md') -Value $Summary -Encoding utf8
 
@@ -223,7 +231,10 @@ Memory figures are Windows process-level observations, not allocator-exclusive b
     Write-Host "Benchmark suite completed: $OutputDirectory"
 } catch {
     $Failures.Add($_.Exception.Message)
-    if ($CriterionDirectory -and (Test-Path -LiteralPath $CriterionDirectory)) {
+    $CompleteCriterionDestination = Join-Path $RawDirectory 'criterion'
+    if ($CriterionDirectory -and
+        (Test-Path -LiteralPath $CriterionDirectory) -and
+        !(Test-Path -LiteralPath $CompleteCriterionDestination)) {
         $PartialDestination = Join-Path $RawDirectory 'criterion-partial'
         if (!(Test-Path -LiteralPath $PartialDestination)) {
             Copy-Item -Recurse -LiteralPath $CriterionDirectory -Destination $PartialDestination
