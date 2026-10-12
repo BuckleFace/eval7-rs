@@ -1,0 +1,10 @@
+[package]
+name = "eval7-rs"
+version = "0.1.0"
+edition = "2024"
+description = "Seven-card poker hand evaluator using suit canonicalisation"
+
+[dependencies]
+
+[dev-dependencies]
+sha2 = "0.10"
