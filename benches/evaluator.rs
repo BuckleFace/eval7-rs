@@ -2,7 +2,7 @@ use std::hint::black_box;
 use std::time::Duration;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use eval7_rs::benchmark_support::{FreshFormulaIndexer, UncheckedEvaluator, cards_are_distinct};
+use eval7_rs::benchmark_support::{FreshFormulaIndexer, cards_are_distinct};
 use eval7_rs::{Card, Evaluator};
 
 const RANDOM_HAND_COUNT: usize = 4_096;
@@ -64,15 +64,14 @@ fn fixed_board_hands() -> Vec<[Card; 7]> {
 
 fn benchmark_repeated_hand(criterion: &mut Criterion) {
     let evaluator = Evaluator::new();
-    let unchecked = UncheckedEvaluator::new();
     let hand = cards(["As", "Ks", "Qs", "Js", "Ts", "2d", "3c"]);
     let mut group = criterion.benchmark_group("repeated_hand");
 
     group.bench_function("public_checked", |bencher| {
         bencher.iter(|| evaluator.evaluate_7(black_box(hand)).unwrap())
     });
-    group.bench_function("internal_unchecked", |bencher| {
-        bencher.iter(|| unchecked.evaluate_distinct(black_box(hand)))
+    group.bench_function("public_unchecked", |bencher| {
+        bencher.iter(|| evaluator.evaluate_7_unchecked(black_box(hand)))
     });
     group.bench_function("duplicate_validation_only", |bencher| {
         bencher.iter(|| cards_are_distinct(black_box(hand)))
@@ -82,7 +81,6 @@ fn benchmark_repeated_hand(criterion: &mut Criterion) {
 
 fn benchmark_distributed_hands(criterion: &mut Criterion) {
     let evaluator = Evaluator::new();
-    let unchecked = UncheckedEvaluator::new();
     let hands = random_hands();
     let mut group = criterion.benchmark_group("random_distributed");
 
@@ -96,11 +94,11 @@ fn benchmark_distributed_hands(criterion: &mut Criterion) {
     });
 
     let mut unchecked_cursor = 0usize;
-    group.bench_function("internal_unchecked", |bencher| {
+    group.bench_function("public_unchecked", |bencher| {
         bencher.iter(|| {
             let hand = hands[unchecked_cursor];
             unchecked_cursor = (unchecked_cursor + 1) & (RANDOM_HAND_COUNT - 1);
-            unchecked.evaluate_distinct(black_box(hand))
+            evaluator.evaluate_7_unchecked(black_box(hand))
         })
     });
     group.finish();
@@ -108,7 +106,6 @@ fn benchmark_distributed_hands(criterion: &mut Criterion) {
 
 fn benchmark_fixed_board(criterion: &mut Criterion) {
     let evaluator = Evaluator::new();
-    let unchecked = UncheckedEvaluator::new();
     let hands = fixed_board_hands();
     let mut group = criterion.benchmark_group("fixed_board");
 
@@ -125,14 +122,14 @@ fn benchmark_fixed_board(criterion: &mut Criterion) {
     });
 
     let mut unchecked_cursor = 0usize;
-    group.bench_function("internal_unchecked", |bencher| {
+    group.bench_function("public_unchecked", |bencher| {
         bencher.iter(|| {
             let hand = hands[unchecked_cursor];
             unchecked_cursor += 1;
             if unchecked_cursor == hands.len() {
                 unchecked_cursor = 0;
             }
-            unchecked.evaluate_distinct(black_box(hand))
+            evaluator.evaluate_7_unchecked(black_box(hand))
         })
     });
     group.finish();
@@ -140,7 +137,6 @@ fn benchmark_fixed_board(criterion: &mut Criterion) {
 
 fn benchmark_sequential_batches(criterion: &mut Criterion) {
     let evaluator = Evaluator::new();
-    let unchecked = UncheckedEvaluator::new();
     let hands = random_hands();
     let mut group = criterion.benchmark_group("sequential_batch");
     group.throughput(Throughput::Elements(hands.len() as u64));
@@ -160,14 +156,14 @@ fn benchmark_sequential_batches(criterion: &mut Criterion) {
         },
     );
     group.bench_with_input(
-        BenchmarkId::new("internal_unchecked", hands.len()),
+        BenchmarkId::new("public_unchecked", hands.len()),
         &hands,
         |bencher, hands| {
             bencher.iter(|| {
                 let mut checksum = 0u64;
                 for &hand in hands {
                     checksum = checksum
-                        .wrapping_add(unchecked.evaluate_distinct(black_box(hand)).raw() as u64);
+                        .wrapping_add(evaluator.evaluate_7_unchecked(black_box(hand)).raw() as u64);
                 }
                 black_box(checksum)
             })

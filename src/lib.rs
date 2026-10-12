@@ -1,5 +1,7 @@
 //! Seven-card poker hand evaluation using an embedded canonical rank table.
 
+#![forbid(unsafe_code)]
+
 #[cfg(feature = "bench-internals")]
 #[doc(hidden)]
 pub mod benchmark_support;
@@ -21,5 +23,5 @@ mod tables;
 mod tests;
 
 pub use card::{Card, CardError};
-pub use evaluator::{EvaluationError, Evaluator, evaluate_7};
+pub use evaluator::{EvaluationError, Evaluator, evaluate_7, evaluate_7_unchecked};
 pub use rank::{HandCategory, HandRank};

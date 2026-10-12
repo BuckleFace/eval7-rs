@@ -38,11 +38,17 @@ impl Evaluator {
     /// Evaluates seven distinct cards.
     pub fn evaluate_7(&self, cards: [Card; 7]) -> Result<HandRank, EvaluationError> {
         validate_distinct(cards)?;
-        Ok(self.evaluate_7_distinct(cards))
+        Ok(self.evaluate_7_unchecked(cards))
     }
 
+    /// Evaluates seven cards without checking that they are distinct.
+    ///
+    /// The caller is responsible for supplying a valid seven-card combination.
+    /// Duplicate cards may produce a meaningless result or panic, but cannot
+    /// cause undefined behavior. This path is intended for performance-sensitive
+    /// callers that have already established card uniqueness.
     #[inline]
-    pub(crate) fn evaluate_7_distinct(&self, cards: [Card; 7]) -> HandRank {
+    pub fn evaluate_7_unchecked(&self, cards: [Card; 7]) -> HandRank {
         let key = canonical_key_7_by_suit_masks(cards);
         let index = self.indexer.index_for_key(key);
         debug_assert!(index < ENTRY_COUNT);
@@ -59,6 +65,16 @@ impl Default for Evaluator {
 /// Evaluates seven distinct cards using the shared embedded evaluator.
 pub fn evaluate_7(cards: [Card; 7]) -> Result<HandRank, EvaluationError> {
     Evaluator::new().evaluate_7(cards)
+}
+
+/// Evaluates seven cards without checking that they are distinct.
+///
+/// The caller is responsible for supplying a valid seven-card combination.
+/// Duplicate cards may produce a meaningless result or panic, but cannot cause
+/// undefined behavior. This safe function skips application-level validation;
+/// it does not perform any unchecked memory access.
+pub fn evaluate_7_unchecked(cards: [Card; 7]) -> HandRank {
+    Evaluator::new().evaluate_7_unchecked(cards)
 }
 
 #[inline]

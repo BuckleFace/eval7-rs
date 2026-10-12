@@ -1,6 +1,6 @@
 use crate::direct::evaluate_7_direct;
 use crate::reference::reference_eval_7;
-use crate::{Card, Evaluator, HandCategory, evaluate_7};
+use crate::{Card, Evaluator, HandCategory, evaluate_7, evaluate_7_unchecked};
 
 fn cards(text: [&str; 7]) -> [Card; 7] {
     text.map(|card| card.parse().expect("test card should be valid"))
@@ -48,8 +48,12 @@ fn detects_every_hand_category() {
     ];
 
     for (text, expected) in cases {
-        let rank = evaluate_7(cards(text)).unwrap();
-        assert_eq!(rank.category(), expected, "cards: {text:?}");
+        let hand = cards(text);
+        let checked = evaluate_7(hand).unwrap();
+        let unchecked = evaluate_7_unchecked(hand);
+        assert_eq!(checked.category(), expected, "cards: {text:?}");
+        assert_eq!(unchecked.category(), expected, "cards: {text:?}");
+        assert_eq!(checked, unchecked, "cards: {text:?}");
     }
 }
 
@@ -101,6 +105,17 @@ fn embedded_table_matches_original_direct_algorithm_on_representative_hands() {
 }
 
 #[test]
+fn free_functions_and_evaluator_methods_are_identical() {
+    let evaluator = Evaluator::new();
+    let hand = cards(["Ac", "Ad", "Kh", "9s", "7c", "4d", "2h"]);
+    assert_eq!(evaluate_7(hand), evaluator.evaluate_7(hand));
+    assert_eq!(
+        evaluate_7_unchecked(hand),
+        evaluator.evaluate_7_unchecked(hand)
+    );
+}
+
+#[test]
 fn deterministic_sample_matches_original_direct_and_reference_evaluators() {
     const SAMPLE_COUNT: usize = 50_000;
     let evaluator = Evaluator::new();
@@ -116,11 +131,16 @@ fn deterministic_sample_matches_original_direct_and_reference_evaluators() {
         }
         let hand: [Card; 7] = deck[..7].try_into().unwrap();
         let embedded = evaluator.evaluate_7(hand).unwrap();
+        let unchecked = evaluator.evaluate_7_unchecked(hand);
         let direct = evaluate_7_direct(hand);
         let reference = reference_eval_7(hand);
         assert_eq!(
             embedded, direct,
             "embedded/direct mismatch at sample {sample}"
+        );
+        assert_eq!(
+            embedded, unchecked,
+            "checked/unchecked mismatch at sample {sample}"
         );
         assert_eq!(
             direct, reference.rank,
