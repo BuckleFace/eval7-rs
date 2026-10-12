@@ -1,5 +1,8 @@
 //! Seven-card poker hand evaluation using an embedded canonical rank table.
 
+#[cfg(feature = "bench-internals")]
+#[doc(hidden)]
+pub mod benchmark_support;
 mod canonical;
 mod card;
 #[cfg(test)]

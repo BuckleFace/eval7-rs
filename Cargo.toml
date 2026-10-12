@@ -4,7 +4,20 @@ version = "0.1.0"
 edition = "2024"
 description = "Seven-card poker hand evaluator using suit canonicalisation"
 
+[features]
+bench-internals = []
+
 [dependencies]
 
 [dev-dependencies]
+criterion = "0.8.2"
 sha2 = "0.10"
+
+[[bench]]
+name = "evaluator"
+harness = false
+required-features = ["bench-internals"]
+
+[[example]]
+name = "first_use"
+required-features = ["bench-internals"]

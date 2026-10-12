@@ -38,10 +38,15 @@ impl Evaluator {
     /// Evaluates seven distinct cards.
     pub fn evaluate_7(&self, cards: [Card; 7]) -> Result<HandRank, EvaluationError> {
         validate_distinct(cards)?;
+        Ok(self.evaluate_7_distinct(cards))
+    }
+
+    #[inline]
+    pub(crate) fn evaluate_7_distinct(&self, cards: [Card; 7]) -> HandRank {
         let key = canonical_key_7_by_suit_masks(cards);
         let index = self.indexer.index_for_key(key);
         debug_assert!(index < ENTRY_COUNT);
-        Ok(rank_at(index))
+        rank_at(index)
     }
 }
 
@@ -57,7 +62,7 @@ pub fn evaluate_7(cards: [Card; 7]) -> Result<HandRank, EvaluationError> {
 }
 
 #[inline]
-fn validate_distinct(cards: [Card; 7]) -> Result<(), EvaluationError> {
+pub(crate) fn validate_distinct(cards: [Card; 7]) -> Result<(), EvaluationError> {
     let mut seen = 0u64;
     for card in cards {
         let bit = 1u64 << card.id();
