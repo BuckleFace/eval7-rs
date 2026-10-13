@@ -2,7 +2,27 @@
 name = "eval7-rs"
 version = "0.1.0"
 edition = "2024"
-description = "Seven-card poker hand evaluator using suit canonicalisation"
+rust-version = "1.85"
+authors = ["Jack Buckley"]
+description = "Exact seven-card poker hand evaluation using suit canonicalisation"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/BuckleFace/eval7-rs"
+documentation = "https://docs.rs/eval7-rs"
+readme = "README.md"
+keywords = ["poker", "evaluator", "cards", "texas-holdem", "lookup-table"]
+categories = ["algorithms", "game-development"]
+include = [
+    "/src/**",
+    "/benches/evaluator.rs",
+    "/data/eval7-ranks-v1.bin",
+    "/data/README.md",
+    "/examples/basic.rs",
+    "/examples/first_use.rs",
+    "/tests/public_api.rs",
+    "/README.md",
+    "/LICENSE-MIT",
+    "/LICENSE-APACHE",
+]
 
 [features]
 bench-internals = []

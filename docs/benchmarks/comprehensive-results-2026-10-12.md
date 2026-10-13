@@ -13,7 +13,7 @@ The six reported failures were, exactly:
 - `memory probe aya_poker failed: exit code `
 - `memory probe poker failed: exit code `
 
-Each probe actually started, printed a complete record, remained alive for the requested three-second sampling interval, produced an empty stderr file, and contributed a row to `raw/memory.csv`. Windows PowerShell read `System.Diagnostics.Process.ExitCode` as `$null` after `WaitForExit()`. Because `$null -ne 0` is true in this context, every successful probe was recorded as a failure. The runner now refreshes the process object, confirms `HasExited`, rejects an unavailable exit code explicitly, and then compares the integer exit code.
+Each probe actually started, printed a complete record, remained alive for the requested three-second sampling interval, produced an empty stderr file, and contributed a row to `raw/memory.csv`. Windows PowerShell read `System.Diagnostics.Process.ExitCode` as `$null` after `WaitForExit()`. Because `$null -ne 0` is true in this context, every successful probe was recorded as a failure. The runner now acquires the native process handle while the child is alive, refreshes the process object, confirms `HasExited`, rejects an unavailable exit code explicitly, and then compares the integer exit code.
 
 Two reporting defects were also found and fixed for future runs:
 

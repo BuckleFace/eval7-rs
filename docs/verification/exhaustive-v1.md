@@ -11,6 +11,10 @@
 - Run Unix timestamp: `1791813320`
 - Embedded payload SHA-256: `ce0ec3e9be1332a76d74cf47368dd37953cef6e097c31cfb4a54062c8b83b774`
 
+## Release applicability
+
+The production rank table, rank encoding, formula index and suit-canonicalisation operations are unchanged in the release branch. Later commits added the public unchecked wrapper and split canonicalisation into benchmarkable stages without changing the checked evaluator's ranking path. The exhaustive run was therefore not repeated during release preparation.
+
 ## Toolchain
 
 ```text

@@ -160,6 +160,10 @@ $($DirtyLines -join "`n")
             $Stderr = Join-Path $RawDirectory "memory-$Name.stderr.txt"
             try {
                 $Process = Start-Process -FilePath $Probe -ArgumentList @($Name, '3000', '20000') -PassThru -RedirectStandardOutput $Stdout -RedirectStandardError $Stderr
+                # Acquire the native handle while the child is alive. Windows
+                # PowerShell's PassThru object can otherwise lose its exit code
+                # after termination; Refresh() alone does not recover it.
+                $null = $Process.Handle
                 $ReadyDeadline = (Get-Date).AddSeconds(30)
                 while (!$Process.HasExited -and (!(Test-Path -LiteralPath $Stdout) -or (Get-Item -LiteralPath $Stdout).Length -eq 0)) {
                     if ((Get-Date) -gt $ReadyDeadline) {

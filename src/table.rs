@@ -6,6 +6,7 @@ const PAYLOAD_BYTES: usize = ENTRY_COUNT * 2;
 const FILE_BYTES: usize = HEADER_BYTES + PAYLOAD_BYTES;
 const TABLE_FILE: &[u8; FILE_BYTES] = include_bytes!("../data/eval7-ranks-v1.bin");
 
+#[allow(dead_code)] // Used by const evaluation; Rust 1.85 does not count that as a lint use.
 pub(crate) const EXPECTED_PAYLOAD_SHA256: [u8; 32] = [
     0xce, 0x0e, 0xc3, 0xe9, 0xbe, 0x13, 0x32, 0xa7, 0x6d, 0x74, 0xcf, 0x47, 0x36, 0x8d, 0xd3, 0x79,
     0x53, 0xce, 0xf6, 0xe0, 0x97, 0xc3, 0x1c, 0xfb, 0x4a, 0x54, 0x06, 0x2c, 0x8b, 0x83, 0xb7, 0x74,
@@ -23,6 +24,7 @@ pub(crate) fn rank_at(index: usize) -> HandRank {
     ]))
 }
 
+#[allow(dead_code)] // Called by the compile-time header assertion above.
 const fn validate_header(bytes: &[u8; FILE_BYTES]) {
     let magic = b"E7RANKS\0";
     let mut i = 0;
@@ -58,10 +60,12 @@ const fn validate_header(bytes: &[u8; FILE_BYTES]) {
     }
 }
 
+#[allow(dead_code)]
 const fn read_u16(bytes: &[u8], offset: usize) -> u16 {
     u16::from_le_bytes([bytes[offset], bytes[offset + 1]])
 }
 
+#[allow(dead_code)]
 const fn read_u32(bytes: &[u8], offset: usize) -> u32 {
     u32::from_le_bytes([
         bytes[offset],
@@ -71,6 +75,7 @@ const fn read_u32(bytes: &[u8], offset: usize) -> u32 {
     ])
 }
 
+#[allow(dead_code)]
 const fn read_u64(bytes: &[u8], offset: usize) -> u64 {
     u64::from_le_bytes([
         bytes[offset],

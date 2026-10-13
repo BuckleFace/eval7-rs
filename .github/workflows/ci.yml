@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  validate:
+    name: Format, lint, test, document, and package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust with components
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
+
+      - name: Test default features
+        run: cargo test --locked
+
+      - name: Test all features
+        run: cargo test --locked --all-features
+
+      - name: Build documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --locked --no-deps --all-features
+
+      - name: Verify embedded table checksum
+        run: echo "b2b2e1a4dbec03823d5bc7845158c6c771345536221a5035f3181ed3f3b66b59  data/eval7-ranks-v1.bin" | sha256sum --check
+
+      - name: Verify distributable package
+        run: cargo package --locked
