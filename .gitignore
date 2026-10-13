@@ -1,7 +1,6 @@
 # Cargo output
 /target/
 **/target/
-/benchmark-results/
 
 # Rust tooling
 **/*.rs.bk

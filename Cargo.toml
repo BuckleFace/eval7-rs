@@ -17,7 +17,6 @@ include = [
     "/data/eval7-ranks-v1.bin",
     "/data/README.md",
     "/examples/basic.rs",
-    "/examples/first_use.rs",
     "/tests/public_api.rs",
     "/README.md",
     "/LICENSE-MIT",
@@ -36,8 +35,4 @@ sha2 = "0.10"
 [[bench]]
 name = "evaluator"
 harness = false
-required-features = ["bench-internals"]
-
-[[example]]
-name = "first_use"
 required-features = ["bench-internals"]
