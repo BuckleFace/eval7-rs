@@ -1,6 +1,7 @@
 # eval7-rs
 
 [![CI](https://github.com/BuckleFace/eval7-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/BuckleFace/eval7-rs/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/eval7-rs.svg)](https://crates.io/crates/eval7-rs)
 
 `eval7-rs` is an exact seven-card poker hand evaluator for Rust. It converts a
 validated seven-card hand into a compact, directly comparable rank using suit
@@ -20,11 +21,9 @@ Highlights:
 
 ## Installation
 
-Until the first crates.io release, depend on the GitHub repository:
-
 ```toml
 [dependencies]
-eval7-rs = { git = "https://github.com/BuckleFace/eval7-rs", branch = "main" }
+eval7-rs = "0.1.0"
 ```
 
 The minimum supported Rust version is 1.85.
