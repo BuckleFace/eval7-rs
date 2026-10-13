@@ -149,3 +149,40 @@ fn deterministic_sample_matches_original_direct_and_reference_evaluators() {
         );
     }
 }
+
+#[test]
+#[ignore = "enumerates all 133,784,560 seven-card hands; run explicitly in release mode"]
+fn exhaustive_all_seven_card_hands_match_direct_evaluator() {
+    const EXPECTED_HANDS: u64 = 133_784_560;
+
+    let evaluator = Evaluator::new();
+    let deck: [Card; 52] =
+        std::array::from_fn(|id| Card::new(id as u8).expect("deck id should be valid"));
+    let mut evaluated = 0u64;
+
+    for a in 0..46 {
+        for b in (a + 1)..47 {
+            for c in (b + 1)..48 {
+                for d in (c + 1)..49 {
+                    for e in (d + 1)..50 {
+                        for f in (e + 1)..51 {
+                            for g in (f + 1)..52 {
+                                let hand = [
+                                    deck[a], deck[b], deck[c], deck[d], deck[e], deck[f], deck[g],
+                                ];
+                                let embedded = evaluator
+                                    .evaluate_7(hand)
+                                    .expect("enumerated cards are distinct");
+                                let direct = evaluate_7_direct(hand);
+                                assert_eq!(embedded, direct, "mismatch for {hand:?}");
+                                evaluated += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    assert_eq!(evaluated, EXPECTED_HANDS);
+}

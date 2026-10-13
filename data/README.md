@@ -27,10 +27,8 @@ The complete file SHA-256 is:
 b2b2e1a4dbec03823d5bc7845158c6c771345536221a5035f3181ed3f3b66b59
 ```
 
-Reproduce it from the legacy solver table with:
-
-```text
-cargo run --release --manifest-path tools/table-converter/Cargo.toml -- <legacy-table> data/eval7-ranks-v1.bin
-```
-
-The converter validates the legacy header, exact file length, strict key ordering, every canonical key, every formula index, packed rank categories, and the expected payload SHA-256 before writing the output.
+The table was converted once from the legacy canonical table for the v1
+format. That legacy input is not distributed with this repository, so the
+one-off converter is not retained. The library validates the format and
+payload identity at compile time, tests the payload digest, and CI checks the
+complete file digest. The v1 table must not be regenerated or modified.
