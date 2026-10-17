@@ -1,6 +1,4 @@
-use crate::canonical::canonical_key_from_packed_suits;
-use crate::formula::{Canonical7FormulaIndexer, shared_indexer};
-use crate::table::{ENTRY_COUNT, rank_at};
+use crate::hybrid::HandState;
 use crate::{Card, EvaluationError, HandRank};
 
 /// A validated five-card board reusable with different two-card hands.
@@ -9,9 +7,8 @@ use crate::{Card, EvaluationError, HandRank};
 /// the board avoids repeating its validation and aggregation, which can help
 /// when several hands share a board; a speedup is not guaranteed.
 ///
-/// The immutable object requires no per-board heap allocation. Like
-/// [`crate::Evaluator::new`], construction initializes shared indexing data on first
-/// use; that one-time initialization may allocate.
+/// The immutable object requires no heap allocation or shared initialization;
+/// all indexing support and rank tables are embedded in the library.
 ///
 /// # Examples
 ///
@@ -30,10 +27,7 @@ use crate::{Card, EvaluationError, HandRank};
 /// ```
 #[derive(Clone, Copy)]
 pub struct PreparedBoard {
-    // Preserve the original suit lanes until the hole cards are added:
-    // sorting the board alone would lose their alignment with hole-card suits.
-    board: u64,
-    indexer: &'static Canonical7FormulaIndexer,
+    state: HandState,
 }
 
 impl PreparedBoard {
@@ -41,10 +35,8 @@ impl PreparedBoard {
     ///
     /// Returns [`EvaluationError::DuplicateCard`] for the first repeated card.
     pub fn new(board: [Card; 5]) -> Result<Self, EvaluationError> {
-        let board = extend_distinct(0, board)?;
         Ok(Self {
-            board,
-            indexer: shared_indexer(),
+            state: extend_distinct(HandState::empty(), board)?,
         })
     }
 
@@ -58,13 +50,10 @@ impl PreparedBoard {
     /// affect the rank. The same object can be reused after an error.
     #[inline]
     pub fn evaluate(&self, holes: [Card; 2]) -> Result<HandRank, EvaluationError> {
-        let seven = extend_distinct(self.board, holes)?;
-        // Validation establishes exactly seven bits before V1 indexing.
-        let index = self
-            .indexer
-            .index_for_key(canonical_key_from_packed_suits(seven));
-        debug_assert!(index < ENTRY_COUNT);
-        Ok(rank_at(index))
+        // Copying the aggregate leaves this board unchanged, including after
+        // validation errors. Adding two cards gives the ordinary seven-card
+        // aggregate: count addition and suit-mask union are associative.
+        Ok(extend_distinct(self.state, holes)?.rank())
     }
 }
 
@@ -72,15 +61,14 @@ impl PreparedBoard {
 /// local so ordinary evaluation retains its existing validation hot path.
 #[inline]
 fn extend_distinct<const N: usize>(
-    mut seen: u64,
+    mut state: HandState,
     cards: [Card; N],
-) -> Result<u64, EvaluationError> {
+) -> Result<HandState, EvaluationError> {
     for card in cards {
-        let bit = 1u64 << card.id();
-        if seen & bit != 0 {
+        if state.contains(card) {
             return Err(EvaluationError::DuplicateCard(card));
         }
-        seen |= bit;
+        state.add(card);
     }
-    Ok(seen)
+    Ok(state)
 }
