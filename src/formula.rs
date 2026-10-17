@@ -9,9 +9,15 @@ const TAIL_SLOTS: usize = 4;
 const REM_COUNT: usize = TOTAL_CARDS + 1;
 const TAIL_LO_COUNT: usize = MASK_COUNT + 1;
 
-/// Dense formula index for sorted four-suit-mask canonical keys.
+/// Ranks sorted four-suit-mask keys in a dense, lexicographic order.
+///
+/// A valid key is a nondecreasing tuple `(m0, m1, m2, m3)` whose mask
+/// popcounts sum to seven. The index is its zero-based position among all such
+/// tuples, ordered first by `m0`, then `m1`, and so on.
 pub(crate) struct Canonical7FormulaIndexer {
+    // `popcounts[m]` is the number of cards represented by suit mask `m`.
     popcounts: Box<[u8]>,
+    // Flattened `T(slots, lo, remaining)` rows; see `new` for the recurrence.
     tails: Box<[[u32; REM_COUNT]]>,
     #[allow(dead_code)]
     total_count: usize,
@@ -27,10 +33,21 @@ impl Canonical7FormulaIndexer {
         let mut tails =
             vec![[0u32; REM_COUNT]; (TAIL_SLOTS + 1) * TAIL_LO_COUNT].into_boxed_slice();
 
+        // Let T(s, lo, r) count nondecreasing sequences of `s` masks, each at
+        // least `lo`, whose popcounts sum to `r`. There is one empty sequence
+        // with no cards, irrespective of the lower bound.
         for lo in 0..=MASK_COUNT {
             tails[tail_row_index(0, lo)][0] = 1;
         }
 
+        // Partition the sequences counted by T(s, lo, r) according to whether
+        // their first mask is greater than `lo` or exactly `lo`:
+        //
+        // T(s, lo, r) = T(s, lo + 1, r)
+        //              + T(s - 1, lo, r - popcount(lo)).
+        //
+        // Keeping `lo` for the suffix permits equal adjacent masks. Iterating
+        // lower bounds downward makes both terms available when a row is built.
         for slots in 1..=TAIL_SLOTS {
             for lo in (0..MASK_COUNT).rev() {
                 let next_row = tails[tail_row_index(slots, lo + 1)];
@@ -73,6 +90,10 @@ impl Canonical7FormulaIndexer {
         let pc3 = self.popcounts[m3] as usize;
         debug_assert_eq!(pc0 + pc1 + pc2 + pc3, TOTAL_CARDS);
 
+        // Count all valid tuples whose first differing mask is smaller than
+        // the corresponding mask in this key. For a fixed prefix, subtracting
+        // two tail counts selects suffixes whose next mask lies between the
+        // prefix's lower bound (inclusive) and the current mask (exclusive).
         let mut index =
             self.tail(TAIL_SLOTS, 0, TOTAL_CARDS) - self.tail(TAIL_SLOTS, m0, TOTAL_CARDS);
 
@@ -85,6 +106,10 @@ impl Canonical7FormulaIndexer {
         let rem_after_m2 = rem_after_m1 - pc2;
         debug_assert_eq!(pc3, rem_after_m2);
         index += self.tail(1, m2, rem_after_m2) - self.tail(1, m3, rem_after_m2);
+
+        // These disjoint counts are precisely the lexicographic predecessors
+        // of the key. Consequently every valid tuple has one rank, and those
+        // ranks fill 0..total_count without gaps.
         index as usize
     }
 

@@ -2,14 +2,23 @@
 #[repr(u16)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum HandCategory {
+    /// Five unmatched cards that form no stronger category.
     HighCard = 0,
+    /// Two cards of one rank.
     Pair = 1,
+    /// Two cards of one rank and two cards of another rank.
     TwoPair = 2,
+    /// Three cards of one rank.
     Trips = 3,
+    /// Five consecutive ranks.
     Straight = 4,
+    /// Five cards of one suit.
     Flush = 5,
+    /// Three cards of one rank and two cards of another rank.
     FullHouse = 6,
+    /// Four cards of one rank.
     Quads = 7,
+    /// Five consecutive ranks of one suit.
     StraightFlush = 8,
 }
 

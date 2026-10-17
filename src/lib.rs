@@ -10,6 +10,7 @@
 //! an embedded table. It performs no runtime filesystem access.
 
 #![forbid(unsafe_code)]
+#![warn(missing_docs)]
 
 #[cfg(feature = "bench-internals")]
 #[doc(hidden)]
