@@ -6,6 +6,9 @@ pub(crate) const FLUSH_ENTRIES: usize = 8_192;
 // W(n,k) counts n remaining rank digits with total k. The empty suffix has
 // W(0,0)=1; W(n,k)=sum_{d=0..min(4,k)} W(n-1,k-d).
 // P(n,k,c)=sum_{d<c} W(n,k-d) counts the suffixes skipped by choosing digit c.
+// Here k includes the current digit; counts are tried in ascending order and
+// rank zero (deuce) is the first lexicographic digit, not the most significant
+// packed lane. W(n,k)=0 when no such suffix exists.
 // Summing P(12-rank,remaining,count) in deuce-to-ace order gives the exact
 // lexicographic ordinal. These disjoint predecessor counts fill 0..49_205.
 const fn block_prefix_counts() -> [[u16; 4096]; 4] {

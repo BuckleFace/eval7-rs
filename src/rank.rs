@@ -44,11 +44,18 @@ pub(crate) const CAT_STRAIGHT_FLUSH: u16 = HandCategory::StraightFlush as u16;
 
 impl HandRank {
     /// Returns the stable v1 packed rank value.
+    ///
+    /// The high four bits encode the [`HandCategory`] discriminant; the low
+    /// twelve bits contain the category-local ordering payload. This encoding
+    /// is unchanged in crate version 0.2.0.
     pub const fn raw(self) -> u16 {
         self.0
     }
 
     /// Returns the category-local ordering payload.
+    ///
+    /// Larger payloads are stronger within a category. Payloads from different
+    /// categories are not directly comparable; compare the full rank instead.
     pub const fn payload(self) -> u16 {
         self.0 & PAYLOAD_MASK
     }
@@ -74,7 +81,7 @@ impl HandRank {
     }
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) const fn pack(category: u16, payload: u16) -> HandRank {
     HandRank((category << CATEGORY_SHIFT) | payload)
 }

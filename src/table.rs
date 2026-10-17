@@ -28,7 +28,7 @@ pub(crate) fn rank_at(index: usize) -> HandRank {
     ]))
 }
 
-#[allow(dead_code)]
+#[allow(dead_code)] // Const-only use on Rust 1.85, as for the identity above.
 const fn validate_header(bytes: &[u8; FILE_BYTES]) {
     // Build-time compatibility and identity checks, not a recomputed checksum.
     // Tests independently hash the actual payload; CI hashes the complete file.
@@ -66,7 +66,7 @@ const fn validate_header(bytes: &[u8; FILE_BYTES]) {
     }
 }
 
-#[allow(dead_code)]
+#[allow(dead_code)] // Only called during compile-time header validation.
 const fn read_u32(bytes: &[u8], offset: usize) -> u32 {
     u32::from_le_bytes([
         bytes[offset],

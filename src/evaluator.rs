@@ -57,7 +57,7 @@ impl Default for Evaluator {
     }
 }
 
-/// Evaluates seven cards using the shared embedded evaluator.
+/// Returns the rank of the best five-card hand among seven distinct cards.
 ///
 /// Returns [`EvaluationError::DuplicateCard`] if a card occurs more than once.
 ///
