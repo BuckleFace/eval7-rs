@@ -17,8 +17,7 @@ logic or a poker solver. See [CHANGELOG.md](CHANGELOG.md) for release notes.
 eval7-rs = "0.2.0"
 ```
 
-The minimum supported Rust version is 1.85. Version 0.2.0 is being prepared for
-release; until it is published, use a repository checkout to try these APIs.
+The minimum supported Rust version is 1.85.
 
 ## Usage
 

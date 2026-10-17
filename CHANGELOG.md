@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 (unreleased)
+## 0.2.0 — 2026-10-17
 
 - Replace the suit-canonical V1 backend with compact rank-count and flush
   lookups. Core lookup/support data is now 148,458 bytes (about 145 KiB),
