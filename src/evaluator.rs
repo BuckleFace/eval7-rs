@@ -5,10 +5,10 @@ use crate::formula::{Canonical7FormulaIndexer, shared_indexer};
 use crate::table::{ENTRY_COUNT, rank_at};
 use crate::{Card, HandRank};
 
-/// An error returned when seven cards do not form a valid distinct set.
+/// An error returned when evaluation input contains a repeated card.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EvaluationError {
-    /// The same card occurs more than once in the seven-card input.
+    /// A card repeats within the input or overlaps a prepared board.
     DuplicateCard(Card),
 }
 
