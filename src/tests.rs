@@ -155,6 +155,38 @@ fn deterministic_sample_matches_original_direct_and_reference_evaluators() {
 }
 
 #[test]
+fn every_flush_mask_matches_oracles() {
+    let mut visited = 0;
+    for mask in 0u16..8192 {
+        if !(5..=7).contains(&mask.count_ones()) {
+            continue;
+        }
+        let mut ids = Vec::new();
+        for rank in 0..13 {
+            if mask & (1 << rank) != 0 {
+                ids.push(rank);
+            }
+        }
+        let mut filler = 13;
+        while ids.len() < 7 {
+            ids.push(filler);
+            filler += 1;
+        }
+        let hand: [Card; 7] = std::array::from_fn(|i| Card::new(ids[i]).unwrap());
+        let expected = reference_eval_7(hand).rank;
+        for offset in 0..4 {
+            let rotated = hand
+                .map(|card| Card::from_rank_suit(card.rank(), (card.suit() + offset) % 4).unwrap());
+            assert_eq!(evaluate_7(rotated).unwrap(), expected);
+            assert_eq!(evaluate_7_unchecked(rotated), expected);
+            assert_eq!(evaluate_7_direct(rotated), expected);
+        }
+        visited += 1;
+    }
+    assert_eq!(visited, 4_719);
+}
+
+#[test]
 #[ignore = "enumerates all 133,784,560 seven-card hands; run explicitly in release mode"]
 fn exhaustive_all_seven_card_hands_match_direct_evaluator() {
     const EXPECTED_HANDS: u64 = 133_784_560;
@@ -163,6 +195,9 @@ fn exhaustive_all_seven_card_hands_match_direct_evaluator() {
     let deck: [Card; 52] =
         std::array::from_fn(|id| Card::new(id as u8).expect("deck id should be valid"));
     let mut evaluated = 0u64;
+    let mut checksum = 0u64;
+    let mut categories = [0u64; 9];
+    let start = std::time::Instant::now();
 
     for a in 0..46 {
         for b in (a + 1)..47 {
@@ -179,6 +214,14 @@ fn exhaustive_all_seven_card_hands_match_direct_evaluator() {
                                     .expect("enumerated cards are distinct");
                                 let direct = evaluate_7_direct(hand);
                                 assert_eq!(embedded, direct, "mismatch for {hand:?}");
+                                assert_eq!(evaluator.evaluate_7_unchecked(hand), direct);
+                                let prepared = PreparedBoard::new([
+                                    deck[a], deck[b], deck[c], deck[d], deck[e],
+                                ])
+                                .unwrap();
+                                assert_eq!(prepared.evaluate([deck[f], deck[g]]).unwrap(), direct);
+                                checksum += u64::from(embedded.raw());
+                                categories[(embedded.raw() >> 12) as usize] += 1;
                                 evaluated += 1;
                             }
                         }
@@ -189,4 +232,16 @@ fn exhaustive_all_seven_card_hands_match_direct_evaluator() {
     }
 
     assert_eq!(evaluated, EXPECTED_HANDS);
+    assert_eq!(checksum, 981_069_103_748);
+    assert_eq!(
+        categories,
+        [
+            23_294_460, 58_627_800, 31_433_400, 6_461_620, 6_180_020, 4_047_644, 3_473_184,
+            224_848, 41_584
+        ]
+    );
+    println!(
+        "PASS hands={evaluated} checksum={checksum} categories={categories:?} elapsed_s={:.3}",
+        start.elapsed().as_secs_f64()
+    );
 }

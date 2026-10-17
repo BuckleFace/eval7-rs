@@ -1,8 +1,6 @@
 use std::fmt;
 
-use crate::canonical::canonical_key_7_by_suit_masks;
-use crate::formula::{Canonical7FormulaIndexer, shared_indexer};
-use crate::table::{ENTRY_COUNT, rank_at};
+use crate::hybrid::HandState;
 use crate::{Card, HandRank};
 
 /// An error returned when evaluation input contains a repeated card.
@@ -22,18 +20,16 @@ impl fmt::Display for EvaluationError {
 
 impl std::error::Error for EvaluationError {}
 
-/// A reusable seven-card evaluator backed by the embedded rank table.
+/// A stateless seven-card evaluator backed by embedded compact rank tables.
 #[derive(Clone, Copy)]
 pub struct Evaluator {
-    indexer: &'static Canonical7FormulaIndexer,
+    _private: (),
 }
 
 impl Evaluator {
-    /// Creates an evaluator, initializing the shared formula index on first use.
+    /// Creates an evaluator without allocation or runtime table initialization.
     pub fn new() -> Self {
-        Self {
-            indexer: shared_indexer(),
-        }
+        Self { _private: () }
     }
 
     /// Evaluates seven cards, rejecting a duplicate with
@@ -51,10 +47,7 @@ impl Evaluator {
     /// callers that have already established card uniqueness.
     #[inline]
     pub fn evaluate_7_unchecked(&self, cards: [Card; 7]) -> HandRank {
-        let key = canonical_key_7_by_suit_masks(cards);
-        let index = self.indexer.index_for_key(key);
-        debug_assert!(index < ENTRY_COUNT);
-        rank_at(index)
+        HandState::from_cards(cards).rank()
     }
 }
 

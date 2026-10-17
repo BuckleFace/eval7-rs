@@ -1,3 +1,6 @@
+//! Legacy canonical-key diagnostics for the optional benchmark hooks.
+//! These helpers are not part of the compact evaluator's hot path.
+
 use crate::Card;
 
 /// Four 13-bit suit masks packed into a `u64` in ascending mask order.
@@ -18,12 +21,6 @@ pub(crate) fn suit_masks_7(cards: [Card; 7]) -> [u16; 4] {
         packed |= CARD_LANE_MASKS[card.id() as usize];
     }
     suit_masks_from_packed(packed)
-}
-
-/// Canonicalises a suit-major card-bit union containing seven distinct cards.
-#[inline]
-pub(crate) fn canonical_key_from_packed_suits(packed: u64) -> Canonical7Key {
-    canonical_key_from_sorted_suit_masks(sort_suit_masks(suit_masks_from_packed(packed)))
 }
 
 #[inline]
@@ -49,7 +46,7 @@ pub(crate) fn sort_suit_masks(mut masks: [u16; 4]) -> [u16; 4] {
 /// Packs four masks that are already sorted in ascending order.
 ///
 /// Placing the smallest mask in the most significant lane makes numeric key
-/// order agree with the lexicographic tuple order used by the formula indexer.
+/// order agree with the lexicographic tuple order used by the retired V1 indexer.
 #[inline]
 pub(crate) fn canonical_key_from_sorted_suit_masks(masks: [u16; 4]) -> Canonical7Key {
     ((masks[0] as u64) << 39)

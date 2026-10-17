@@ -3,14 +3,13 @@
 [![CI](https://github.com/BuckleFace/eval7-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/BuckleFace/eval7-rs/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/eval7-rs.svg)](https://crates.io/crates/eval7-rs)
 
-`eval7-rs` is an exact seven-card poker hand evaluator for Rust. It maps a
-validated hand to a compact, directly comparable rank using suit
-canonicalisation, formula indexing, and an embedded lookup table.
+`eval7-rs` evaluates standard seven-card, 52-card high poker hands and returns
+a compact, directly comparable rank. It has no runtime dependencies, allocation,
+filesystem access, unsafe code or runtime table generation.
 
-The crate evaluates standard 52-card high poker. It has no runtime
-dependencies, filesystem access, unsafe code, or table generation. It does
-not provide five-card evaluation, equity calculation, ranges, game-state
-logic, or a poker solver.
+It does not provide five-card evaluation, equity calculation, ranges, game-state
+logic or a poker solver. The compact backend described here is an unreleased
+development change; this branch does not change the crate version or publish it.
 
 ## Installation
 
@@ -19,48 +18,47 @@ logic, or a poker solver.
 eval7-rs = "0.1.0"
 ```
 
-The minimum supported Rust version is 1.85.
+The minimum supported Rust version is 1.85. Use the repository checkout to try
+unreleased changes, including the compact backend and PreparedBoard API.
 
 ## Usage
 
 ```rust
 use eval7_rs::{Card, HandCategory, evaluate_7};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let straight_flush = ["As", "Ks", "Qs", "Js", "Ts", "2d", "3c"]
-        .map(|text| text.parse::<Card>().expect("valid card"));
-    let pair = ["Ac", "Ad", "Kh", "9s", "7c", "4d", "2h"]
-        .map(|text| text.parse::<Card>().expect("valid card"));
-
-    let stronger = evaluate_7(straight_flush)?;
-    let weaker = evaluate_7(pair)?;
-
-    assert_eq!(stronger.category(), HandCategory::StraightFlush);
-    assert!(stronger > weaker);
-    Ok(())
-}
-```
-
-Cards can also be constructed from an ID in `0..=51`, or from a rank in
-`2..=14` and suit in `0..=3`. IDs are suit-major in clubs, diamonds, hearts,
-spades order, with ranks from deuce through ace.
-
-`evaluate_7` rejects duplicate cards. If uniqueness is already guaranteed,
-`evaluate_7_unchecked` skips only that check:
-
-```rust
-use eval7_rs::{Card, evaluate_7_unchecked};
-
 let cards = ["As", "Ks", "Qs", "Js", "Ts", "2d", "3c"]
     .map(|text| text.parse::<Card>().unwrap());
-let rank = evaluate_7_unchecked(cards);
+let rank = evaluate_7(cards).unwrap();
+
+assert_eq!(rank.category(), HandCategory::StraightFlush);
 ```
 
-Despite its name, the unchecked function is safe Rust and performs no
-unchecked memory access. Duplicate input may return a meaningless rank or
-panic, but cannot cause undefined behaviour. Reuse an `Evaluator` when
-evaluating many hands to initialize the shared formula index before the hot
-loop.
+Cards can also be constructed from an ID in `0..=51`, or a rank in `2..=14`
+and suit in `0..=3`. IDs are suit-major: clubs, diamonds, hearts, spades,
+with ranks from deuce through ace.
+
+`evaluate_7` rejects duplicates. `evaluate_7_unchecked` skips that validation
+for callers that already guarantee seven distinct cards. It is safe Rust:
+duplicates may return a meaningless rank or panic, but cannot cause undefined
+behaviour. The corresponding methods on `Evaluator` have the same semantics.
+Evaluators are stateless and cheap to construct, with no first-use initialization.
+
+For repeated evaluation against a fixed five-card board:
+
+```rust
+use eval7_rs::{Card, PreparedBoard};
+
+let board = ["Ah", "Kh", "Qh", "2c", "3d"]
+    .map(|text| text.parse::<Card>().unwrap());
+let prepared = PreparedBoard::new(board).unwrap();
+let holes = ["Jh", "Th"].map(|text| text.parse::<Card>().unwrap());
+let rank = prepared.evaluate(holes).unwrap();
+```
+
+Construction validates and aggregates the board once. Each evaluation validates
+the two hole cards, including board overlap, and ranks the best five of all
+seven cards. Neither hole card must be used. The immutable board is reusable,
+including after errors, and performs no heap allocation.
 
 ## Rank semantics
 
@@ -72,67 +70,58 @@ High card < Pair < Two pair < Trips < Straight < Flush
           < Full house < Quads < Straight flush
 ```
 
-`HandRank::raw()` returns the stable v1 packed `u16`; `category()` returns the
-semantic category, and `payload()` returns its category-local ordering value.
+`HandRank::raw()` retains the stable v1 packed `u16` encoding. `category()`
+returns the category, and `payload()` its category-local ordering value.
+The compact backend changes table addressing, not rank values or ordering.
 
 ## Implementation
 
-Each card contributes a rank bit to one of four 13-bit suit masks. Sorting
-those masks removes arbitrary suit names while preserving rank and flush
-information. A combinatorial formula then maps the canonical 52-bit key to a
-dense index, which selects one little-endian `u16` from the embedded table.
+Cards contribute to thirteen three-bit rank-count lanes and four suit counters.
+Original suit masks are retained for flush lookups. If a suit has at least
+five cards, its 13-bit mask selects the best flush or straight flush directly.
+With only seven cards, a full house or quads cannot coexist with that flush.
 
-Suit-equivalent hands share an entry, reducing 133,784,560 physical hands to
-6,009,159 canonical ranks. The versioned table is 12,018,382 bytes: a 64-byte
-header plus 6,009,159 rank values. On first use, the formula indexer builds
-about 1.26 MiB of support tables on the heap. See [data/README.md](data/README.md)
-for the binary layout and checksums.
+Other hands use a dense index over 49,205 rank-count vectors. A carry-free
+prefix sum and four three-rank lookups calculate the same ordinal as serial
+rank-count indexing, without a per-rank dependency chain. The recurrence, ordering and
+packing invariants are documented next to the code in `src/index.rs`.
 
-## Correctness
+Core data is 148,458 bytes (about 145 KiB): a 114,858-byte rank binary,
+32 KiB of indexing support and 832 bytes of card contributions, excluding
+code/alignment. All data is static; no heap indexer is initialized. See
+[data/README.md](data/README.md) for the binary layout and identity checks.
 
-The embedded evaluator has been checked against the original direct evaluator
-for all 133,784,560 distinct seven-card combinations, comparing complete raw
-ranks, with zero mismatches. The exhaustive check remains reproducible as an
-ignored release-mode test:
+## Correctness and performance
+
+The ignored exhaustive test compares complete raw ranks with the unchanged
+direct evaluator over all 133,784,560 distinct hands, including checked,
+unchecked and prepared evaluation:
 
 ```text
-cargo test --release exhaustive_all_seven_card_hands -- --ignored
+cargo test --release exhaustive_all_seven_card_hands -- --ignored --nocapture
 ```
 
-Normal tests cover card validation, duplicate rejection, every hand category,
-ordering, checked/unchecked equivalence, the embedded payload identity, and a
-deterministic 50,000-hand comparison with both the direct evaluator and an
-independent five-card-subset reference evaluator. The exhaustive test is kept
-out of routine CI because it evaluates every possible hand.
+Routine tests also cover all 49,205 count-vector ordinals, every valid flush
+mask in each suit, categories, wheels, duplicate rejection, board partitions,
+suit permutations and 50,000 deterministic hands against both the direct
+evaluator and an independent five-card-subset reference evaluator.
 
-## Performance
-
-Local Criterion measurements on an AMD Ryzen 9 7950X3D with Windows 11 and
-Rust 1.96.1 produced these point estimates:
-
-| Workload | Checked | Prevalidated |
-| --- | ---: | ---: |
-| Repeated hand | 12.719 ns | 8.765 ns |
-| 4,096 distributed hands | 13.735 ns | 10.504 ns |
-| Fixed board, 1,081 hole pairs | 21.647 ns | 19.236 ns |
-| Sequential 4,096-hand batch | 13.132 ns/hand | 10.070 ns/hand |
-
-Criterion used 100 samples, a three-second warm-up, and a five-second
-measurement period. Inputs passed through `black_box`; batch ranks were folded
-into a black-boxed checksum. The machine was not isolated, CPU affinity was not
-pinned, and these results are not cross-machine guarantees.
-
-Run the standalone benchmark with:
+Run the public API benchmarks with:
 
 ```text
 cargo bench --features bench-internals --bench evaluator
 ```
 
+Compare the same fixtures, compiler settings, CPU placement and machine load.
+Stage or initialization timings are not substitutes for complete evaluation
+latency. Historical V1 measurements do not describe the compact backend.
+
 ## Development
 
-CI checks formatting, Clippy with warnings denied, default and all-feature
-tests, rustdoc, the complete table checksum, and `cargo package`. Local
-equivalents are defined in [the CI workflow](.github/workflows/ci.yml).
+CI checks formatting, Clippy with warnings denied, default/all-feature tests,
+Rustdoc, the complete table checksum and `cargo package`. See
+[the workflow](.github/workflows/ci.yml). Exhaustive verification is an explicit
+release-mode check rather than part of routine CI.
 
 ## Licence
 

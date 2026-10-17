@@ -1,4 +1,4 @@
-//! Exact seven-card poker hand evaluation using an embedded canonical rank table.
+//! Exact seven-card poker hand evaluation using embedded compact rank tables.
 //!
 //! [`evaluate_7`] validates that all seven cards are distinct. Callers that
 //! already guarantee uniqueness can use [`evaluate_7_unchecked`] to skip that
@@ -7,9 +7,9 @@
 //! [`PreparedBoard`] validates a five-card board once for repeated evaluation
 //! with different two-card hands.
 //!
-//! The evaluator constructs four 13-bit suit masks, canonicalises suit order,
-//! maps the resulting key to a dense formula index, and reads a `u16` rank from
-//! an embedded table. It performs no runtime filesystem access.
+//! The evaluator aggregates rank multiplicities and suit masks. Flushes use a
+//! direct suit-mask lookup; other hands use a dense combinatorial rank-count
+//! index. All support data is static, with no runtime allocation or file access.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -17,12 +17,14 @@
 #[cfg(feature = "bench-internals")]
 #[doc(hidden)]
 pub mod benchmark_support;
+#[cfg(feature = "bench-internals")]
 mod canonical;
 mod card;
 #[cfg(test)]
 mod direct;
 mod evaluator;
-mod formula;
+mod hybrid;
+mod index;
 mod prepared;
 mod rank;
 #[cfg(test)]

@@ -41,7 +41,7 @@ jobs:
         run: cargo doc --locked --no-deps --all-features
 
       - name: Verify embedded table checksum
-        run: echo "b2b2e1a4dbec03823d5bc7845158c6c771345536221a5035f3181ed3f3b66b59  data/eval7-ranks-v1.bin" | sha256sum --check
+        run: echo "e182e92ac13c7356fcf9e7315dc4b5822bea0731a7cdbdd35d5b82077f75b6ab  data/eval7-compact-v2.bin" | sha256sum --check
 
       - name: Verify distributable package
         run: cargo package --locked

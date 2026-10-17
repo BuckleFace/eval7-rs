@@ -2,8 +2,8 @@ use std::hint::black_box;
 use std::time::Duration;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use eval7_rs::benchmark_support::{FreshFormulaIndexer, cards_are_distinct};
-use eval7_rs::{Card, Evaluator};
+use eval7_rs::benchmark_support::cards_are_distinct;
+use eval7_rs::{Card, Evaluator, PreparedBoard};
 
 const RANDOM_HAND_COUNT: usize = 4_096;
 
@@ -107,6 +107,7 @@ fn benchmark_distributed_hands(criterion: &mut Criterion) {
 fn benchmark_fixed_board(criterion: &mut Criterion) {
     let evaluator = Evaluator::new();
     let hands = fixed_board_hands();
+    let prepared = PreparedBoard::new(hands[0][..5].try_into().unwrap()).unwrap();
     let mut group = criterion.benchmark_group("fixed_board");
 
     let mut checked_cursor = 0usize;
@@ -130,6 +131,17 @@ fn benchmark_fixed_board(criterion: &mut Criterion) {
                 unchecked_cursor = 0;
             }
             evaluator.evaluate_7_unchecked(black_box(hand))
+        })
+    });
+    let mut prepared_cursor = 0usize;
+    group.bench_function("prepared_checked", |bencher| {
+        bencher.iter(|| {
+            let hand = black_box(hands[prepared_cursor]);
+            prepared_cursor += 1;
+            if prepared_cursor == hands.len() {
+                prepared_cursor = 0;
+            }
+            prepared.evaluate([hand[5], hand[6]]).unwrap()
         })
     });
     group.finish();
@@ -173,16 +185,9 @@ fn benchmark_sequential_batches(criterion: &mut Criterion) {
 }
 
 fn benchmark_initialization(criterion: &mut Criterion) {
-    criterion.bench_function(
-        "initialization/formula_indexer_construct_and_drop",
-        |bencher| {
-            bencher.iter(|| {
-                let indexer = FreshFormulaIndexer::new();
-                black_box(indexer.total_count());
-                drop(black_box(indexer));
-            })
-        },
-    );
+    criterion.bench_function("initialization/evaluator_construct", |bencher| {
+        bencher.iter(|| black_box(Evaluator::new()))
+    });
 }
 
 criterion_group! {
