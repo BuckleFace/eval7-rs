@@ -1,5 +1,9 @@
 use crate::HandRank;
 
+// File layout (all integers little-endian): a 64-byte header followed by one
+// `u16` HandRank for each canonical key in formula-index order. The header
+// stores the magic, format and encoding IDs, dimensions, flags, and payload
+// SHA-256; data/README.md records their concrete values.
 pub(crate) const ENTRY_COUNT: usize = 6_009_159;
 const HEADER_BYTES: usize = 64;
 const PAYLOAD_BYTES: usize = ENTRY_COUNT * 2;
@@ -14,6 +18,11 @@ pub(crate) const EXPECTED_PAYLOAD_SHA256: [u8; 32] = [
 
 const _: () = validate_header(TABLE_FILE);
 
+/// Looks up the rank stored at a dense formula index.
+///
+/// The caller must supply an index below [`ENTRY_COUNT`]. Formula indexing and
+/// payload ordering use the same canonical-key order, so no key is stored in
+/// each entry.
 #[inline(always)]
 pub(crate) fn rank_at(index: usize) -> HandRank {
     debug_assert!(index < ENTRY_COUNT);
@@ -26,6 +35,10 @@ pub(crate) fn rank_at(index: usize) -> HandRank {
 
 #[allow(dead_code)] // Called by the compile-time header assertion above.
 const fn validate_header(bytes: &[u8; FILE_BYTES]) {
+    // This function is evaluated by the anonymous constant above. A mismatched
+    // or incompatible embedded file therefore fails the build rather than a
+    // later evaluation. The recorded digest identifies the payload; its bytes
+    // are not recomputed here and are independently checked by the unit test.
     let magic = b"E7RANKS\0";
     let mut i = 0;
     while i < magic.len() {

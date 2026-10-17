@@ -4,9 +4,13 @@ use std::str::FromStr;
 /// An error returned when constructing or parsing a card.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CardError {
+    /// The numeric card ID is outside `0..=51`.
     InvalidId,
+    /// The rank is outside `2..=14` or its text symbol is unrecognised.
     InvalidRank,
+    /// The suit is outside `0..=3` or its text symbol is unrecognised.
     InvalidSuit,
+    /// The textual representation does not contain exactly two characters.
     InvalidText,
 }
 
@@ -41,7 +45,10 @@ impl Card {
         }
     }
 
-    /// Creates a card from a rank in `2..=14` and suit in `0..=3`.
+    /// Creates a card from a rank in `2..=14` and a suit in `0..=3`.
+    ///
+    /// Returns [`CardError::InvalidRank`] or [`CardError::InvalidSuit`] when
+    /// the corresponding value is outside its accepted range.
     pub const fn from_rank_suit(rank: u8, suit: u8) -> Result<Self, CardError> {
         if rank < 2 || rank > 14 {
             return Err(CardError::InvalidRank);
@@ -68,6 +75,9 @@ impl Card {
     }
 
     /// Parses compact two-character card text such as `Ah` or `Td`.
+    ///
+    /// Rank letters and suit letters are ASCII case-insensitive. Invalid
+    /// length, rank, and suit inputs return their corresponding [`CardError`].
     pub fn from_str2(text: &str) -> Result<Self, CardError> {
         let mut chars = text.chars();
         let rank = chars.next().ok_or(CardError::InvalidText)?;

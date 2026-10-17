@@ -8,6 +8,7 @@ use crate::{Card, HandRank};
 /// An error returned when seven cards do not form a valid distinct set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EvaluationError {
+    /// The same card occurs more than once in the seven-card input.
     DuplicateCard(Card),
 }
 
@@ -35,7 +36,8 @@ impl Evaluator {
         }
     }
 
-    /// Evaluates seven distinct cards.
+    /// Evaluates seven cards, rejecting a duplicate with
+    /// [`EvaluationError::DuplicateCard`].
     pub fn evaluate_7(&self, cards: [Card; 7]) -> Result<HandRank, EvaluationError> {
         validate_distinct(cards)?;
         Ok(self.evaluate_7_unchecked(cards))
@@ -62,7 +64,21 @@ impl Default for Evaluator {
     }
 }
 
-/// Evaluates seven distinct cards using the shared embedded evaluator.
+/// Evaluates seven cards using the shared embedded evaluator.
+///
+/// Returns [`EvaluationError::DuplicateCard`] if a card occurs more than once.
+///
+/// # Examples
+///
+/// ```
+/// use eval7_rs::{Card, HandCategory, evaluate_7};
+///
+/// let cards = ["Ah", "Kh", "Qh", "Jh", "Th", "2c", "3d"]
+///     .map(|text| text.parse::<Card>().unwrap());
+/// let rank = evaluate_7(cards).unwrap();
+///
+/// assert_eq!(rank.category(), HandCategory::StraightFlush);
+/// ```
 pub fn evaluate_7(cards: [Card; 7]) -> Result<HandRank, EvaluationError> {
     Evaluator::new().evaluate_7(cards)
 }
@@ -73,6 +89,19 @@ pub fn evaluate_7(cards: [Card; 7]) -> Result<HandRank, EvaluationError> {
 /// Duplicate cards may produce a meaningless result or panic, but cannot cause
 /// undefined behavior. This safe function skips application-level validation;
 /// it does not perform any unchecked memory access.
+///
+/// # Examples
+///
+/// ```
+/// use eval7_rs::{Card, HandCategory, evaluate_7_unchecked};
+///
+/// // This input has already been established to contain seven distinct cards.
+/// let cards = ["As", "Ad", "Ac", "Ah", "Kd", "Qc", "2s"]
+///     .map(|text| text.parse::<Card>().unwrap());
+/// let rank = evaluate_7_unchecked(cards);
+///
+/// assert_eq!(rank.category(), HandCategory::Quads);
+/// ```
 pub fn evaluate_7_unchecked(cards: [Card; 7]) -> HandRank {
     Evaluator::new().evaluate_7_unchecked(cards)
 }
