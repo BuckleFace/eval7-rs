@@ -1,4 +1,5 @@
-//! Packed-card aggregation and flush/non-flush dispatch shared by both APIs.
+//! Packed-card aggregation and flush/non-flush dispatch shared by ordinary and
+//! prepared-board evaluation.
 
 use crate::index::{NON_FLUSH_ENTRIES, non_flush_index};
 use crate::table::rank_at;

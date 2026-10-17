@@ -8,18 +8,17 @@ a compact, directly comparable rank. It has no runtime dependencies, allocation,
 filesystem access, unsafe code or runtime table generation.
 
 It does not provide five-card evaluation, equity calculation, ranges, game-state
-logic or a poker solver. The compact backend described here is an unreleased
-development change; this branch does not change the crate version or publish it.
+logic or a poker solver. See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## Installation
 
 ```toml
 [dependencies]
-eval7-rs = "0.1.0"
+eval7-rs = "0.2.0"
 ```
 
-The minimum supported Rust version is 1.85. Use the repository checkout to try
-unreleased changes, including the compact backend and PreparedBoard API.
+The minimum supported Rust version is 1.85. Version 0.2.0 is being prepared for
+release; until it is published, use a repository checkout to try these APIs.
 
 ## Usage
 
@@ -46,13 +45,14 @@ Evaluators are stateless and cheap to construct, with no first-use initializatio
 For repeated evaluation against a fixed five-card board:
 
 ```rust
-use eval7_rs::{Card, PreparedBoard};
+use eval7_rs::{Card, HandCategory, PreparedBoard};
 
 let board = ["Ah", "Kh", "Qh", "2c", "3d"]
     .map(|text| text.parse::<Card>().unwrap());
 let prepared = PreparedBoard::new(board).unwrap();
 let holes = ["Jh", "Th"].map(|text| text.parse::<Card>().unwrap());
 let rank = prepared.evaluate(holes).unwrap();
+assert_eq!(rank.category(), HandCategory::StraightFlush);
 ```
 
 Construction validates and aggregates the board once. Each evaluation validates
@@ -83,8 +83,8 @@ With only seven cards, a full house or quads cannot coexist with that flush.
 
 Other hands use a dense index over 49,205 rank-count vectors. A carry-free
 prefix sum and four three-rank lookups calculate the same ordinal as serial
-rank-count indexing, without a per-rank dependency chain. The recurrence, ordering and
-packing invariants are documented next to the code in `src/index.rs`.
+rank-count indexing, without a per-rank dependency chain. The recurrence,
+ordering and packing invariants are documented next to the code in `src/index.rs`.
 
 Core data is 148,458 bytes (about 145 KiB): a 114,858-byte rank binary,
 32 KiB of indexing support and 832 bytes of card contributions, excluding

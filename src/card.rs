@@ -37,6 +37,8 @@ pub struct Card(u8);
 
 impl Card {
     /// Creates a card from its canonical ID in `0..=51`.
+    ///
+    /// Returns [`CardError::InvalidId`] for any larger value.
     pub const fn new(id: u8) -> Result<Self, CardError> {
         if id < 52 {
             Ok(Self(id))
@@ -46,6 +48,7 @@ impl Card {
     }
 
     /// Creates a card from a rank in `2..=14` and a suit in `0..=3`.
+    /// Suits are clubs, diamonds, hearts and spades, respectively.
     ///
     /// Returns [`CardError::InvalidRank`] or [`CardError::InvalidSuit`] when
     /// the corresponding value is outside its accepted range.
