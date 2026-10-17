@@ -1,6 +1,6 @@
 use crate::direct::evaluate_7_direct;
 use crate::reference::reference_eval_7;
-use crate::{Card, Evaluator, HandCategory, evaluate_7, evaluate_7_unchecked};
+use crate::{Card, Evaluator, HandCategory, PreparedBoard, evaluate_7, evaluate_7_unchecked};
 
 fn cards(text: [&str; 7]) -> [Card; 7] {
     text.map(|card| card.parse().expect("test card should be valid"))
@@ -54,6 +54,8 @@ fn detects_every_hand_category() {
         assert_eq!(checked.category(), expected, "cards: {text:?}");
         assert_eq!(unchecked.category(), expected, "cards: {text:?}");
         assert_eq!(checked, unchecked, "cards: {text:?}");
+        let prepared = PreparedBoard::new(hand[..5].try_into().unwrap()).unwrap();
+        assert_eq!(prepared.evaluate([hand[5], hand[6]]).unwrap(), checked);
     }
 }
 
@@ -131,6 +133,8 @@ fn deterministic_sample_matches_original_direct_and_reference_evaluators() {
         }
         let hand: [Card; 7] = deck[..7].try_into().unwrap();
         let embedded = evaluator.evaluate_7(hand).unwrap();
+        let prepared = PreparedBoard::new(hand[..5].try_into().unwrap()).unwrap();
+        assert_eq!(prepared.evaluate([hand[5], hand[6]]).unwrap(), embedded);
         let unchecked = evaluator.evaluate_7_unchecked(hand);
         let direct = evaluate_7_direct(hand);
         let reference = reference_eval_7(hand);

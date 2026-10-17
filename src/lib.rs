@@ -4,6 +4,8 @@
 //! already guarantee uniqueness can use [`evaluate_7_unchecked`] to skip that
 //! application-level check. Both APIs return the same directly comparable
 //! [`HandRank`] for valid hands.
+//! [`PreparedBoard`] validates a five-card board once for repeated evaluation
+//! with different two-card hands.
 //!
 //! The evaluator constructs four 13-bit suit masks, canonicalises suit order,
 //! maps the resulting key to a dense formula index, and reads a `u16` rank from
@@ -21,6 +23,7 @@ mod card;
 mod direct;
 mod evaluator;
 mod formula;
+mod prepared;
 mod rank;
 #[cfg(test)]
 mod reference;
@@ -34,4 +37,5 @@ mod tests;
 
 pub use card::{Card, CardError};
 pub use evaluator::{EvaluationError, Evaluator, evaluate_7, evaluate_7_unchecked};
+pub use prepared::PreparedBoard;
 pub use rank::{HandCategory, HandRank};

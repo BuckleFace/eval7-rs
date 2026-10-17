@@ -17,7 +17,17 @@ pub(crate) fn suit_masks_7(cards: [Card; 7]) -> [u16; 4] {
     for card in cards {
         packed |= CARD_LANE_MASKS[card.id() as usize];
     }
+    suit_masks_from_packed(packed)
+}
 
+/// Canonicalises a suit-major card-bit union containing seven distinct cards.
+#[inline]
+pub(crate) fn canonical_key_from_packed_suits(packed: u64) -> Canonical7Key {
+    canonical_key_from_sorted_suit_masks(sort_suit_masks(suit_masks_from_packed(packed)))
+}
+
+#[inline]
+fn suit_masks_from_packed(packed: u64) -> [u16; 4] {
     // Card IDs are suit-major. `card / 13` selects one of four adjacent
     // 13-bit lanes, while `card % 13` selects deuce through ace within it.
     [
